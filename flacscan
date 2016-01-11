@@ -604,13 +604,13 @@ sub tagMp3APIC {
     }
 
     my $frames = $id3->supported_frames();
-    if (!exists $frames->{APIC}) {
+    if (!exists $frames->{"APIC"}) {
         logMsg(WARN, qq{APIC is not a supported frame: $mp3File});
         return;
     }
 
     my $frameids = $id3->get_frame_ids();
-    if (exists $$frameids{APIC}) {
+    if (exists $$frameids{"APIC"}) {
         logMsg(WARN, qq{Replacing existing APIC frame.});
         $id3->change_frame("APIC", HEADER, $$imagedata);
     } else {
