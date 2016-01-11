@@ -862,3 +862,4 @@ sub createFlacTbl {
 
     # TODO error checking here
 }
+
