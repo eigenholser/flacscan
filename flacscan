@@ -66,11 +66,14 @@ if (-e "$cwd/flacscan.conf") {
 }
 
 if (-e $flacscan_config) {
-    Config::Simple->import_from($flacscan_config,'conf');
+    Config::Simple->import_from($flacscan_config, 'conf');
 } else {
     die "Can't find configuration file";
 }
 
+# XXX: Duplicate this to stifle warnings for single use. Is there a better way?
+$flacroot = $conf::CONFIG_FLAC_ROOT;
+$mp3root  = $conf::CONFIG_MP3_ROOT;
 $flacroot = $conf::CONFIG_FLAC_ROOT;
 $mp3root  = $conf::CONFIG_MP3_ROOT;
 
@@ -100,7 +103,7 @@ if (!defined $mp3root) {
 }
 
 # can't do anything requiring logging so do this now
-my $logFile = $flacroot . q{/flacscanner.log};
+my $logFile = $mp3root . q{/flacscanner.log};
 
 # open logfile - but insist that we have exclusive access. this will prevent
 # someone from invoking two or more instances and making a mess of things.
@@ -108,25 +111,25 @@ my $logFh = new FileHandle "$logFile", O_CREAT|O_WRONLY|O_APPEND;
 $logFh->autoflush();
 flock($logFh, LOCK_EX) or die "Can't get write lock on $logFile: $!";
 
-logMsg(MESSAGE,q{Starting conversion against FLAC root } . $flacroot);
-logMsg(MESSAGE,VERSIONID);
+logMsg(MESSAGE, q{Starting conversion against FLAC root } . $flacroot);
+logMsg(MESSAGE, VERSIONID);
 
 # we will need this assurance later
 # flacroot and mp3root must exist already
 if (! -e $flacroot) {
-    logMsg(ERROR,qq{FLAC root does not exist: $flacroot});
+    logMsg(ERROR, qq{FLAC root does not exist: $flacroot});
     cleanUpAndExit();
 }
 
 die unless (-e $mp3root);
 if (! -e $mp3root) {
-    logMsg(ERROR,qq{MP3 root does not exist: $mp3root});
+    logMsg(ERROR, qq{MP3 root does not exist: $mp3root});
     cleanUpAndExit();
 }
 
 # mp3root must be writeable
 if (! -w $mp3root) {
-    logMsg(ERROR,qq{MP3 root is not writeable: $mp3root});
+    logMsg(ERROR, qq{MP3 root is not writeable: $mp3root});
     cleanUpAndExit();
 }
 
@@ -145,7 +148,7 @@ sub cleanUpAndExit {
     $SIG{'INT'} = undef;
     $SIG{'HUP'} = undef;
 
-    logMsg(MESSAGE,qq{Cleaning up and exiting});
+    logMsg(MESSAGE, qq{Cleaning up and exiting});
 
     # if we have a queue of in-progress files, delete 'em
     if ($#activeFiles > -1) {
@@ -162,7 +165,7 @@ sub cleanUpAndExit {
 
     # if signal interrupted child, kill it
     if ($childPid > 0) {
-        logMsg(WARN,qq{Waiting for child process to exit: $childPid});
+        logMsg(WARN, qq{Waiting for child process to exit: $childPid});
     #    kill qw(SIGQUIT $childPid);
 
         # don't leave a zombie
@@ -175,15 +178,15 @@ sub cleanUpAndExit {
 
 # set signal handlers so we'll gracefully handle various signals. these
 # definitions must occur after our cleanUpAndExit() signal handler.
-$SIG{'USR1'} = sub { logMsg(WARN,qq{Caught SIGUSR1}); cleanUpAndExit(); };
-$SIG{'USR2'} = sub { logMsg(WARN,qq{Caught SIGUSR2}); cleanUpAndExit(); };
-$SIG{'TERM'} = sub { logMsg(WARN,qq{Caught SIGTERM}); cleanUpAndExit(); };
-$SIG{'QUIT'} = sub { logMsg(WARN,qq{Caught SIGQUIT}); cleanUpAndExit(); };
-$SIG{'INT'}  = sub { logMsg(WARN,qq{Caught SIGINT}); cleanUpAndExit(); };
-$SIG{'HUP'}  = sub { logMsg(WARN,qq{Caught SIGHUP}); cleanUpAndExit(); };
+$SIG{'USR1'} = sub { logMsg(WARN, qq{Caught SIGUSR1}); cleanUpAndExit(); };
+$SIG{'USR2'} = sub { logMsg(WARN, qq{Caught SIGUSR2}); cleanUpAndExit(); };
+$SIG{'TERM'} = sub { logMsg(WARN, qq{Caught SIGTERM}); cleanUpAndExit(); };
+$SIG{'QUIT'} = sub { logMsg(WARN, qq{Caught SIGQUIT}); cleanUpAndExit(); };
+$SIG{'INT'}  = sub { logMsg(WARN, qq{Caught SIGINT}); cleanUpAndExit(); };
+$SIG{'HUP'}  = sub { logMsg(WARN, qq{Caught SIGHUP}); cleanUpAndExit(); };
 
 # instantiate our SQLITE DB connection
-my $dbh = DBI->connect("dbi:SQLite:dbname=" . $flacroot . q{/} . DB_NAME,"","");
+my $dbh = DBI->connect("dbi:SQLite:dbname=" . $mp3root . q{/} . DB_NAME, "", "");
 
 # TODO - check for errors
 
@@ -292,7 +295,7 @@ sub copyAlbumArt {
         # mp3art file
         my $mp3art = $mp3root . q{/} . $subdir . q{/} . $2;
 
-        print $flacart, " ==> ", $mp3art, "\n";
+        logMsg(DEBUG, qq{Copying $flacart, " ==> ", $mp3art});
         copy $flacart, $mp3art;
     }
     return @albumArt;
@@ -338,7 +341,7 @@ sub scanFlacIndex {
         my $rc_isFlacIndexCurrent = isFlacIndexCurrent($flacFile);
 
         if ($rc_isFlacIndexCurrent == E_FLAC_NOT_EXIST) {
-            logMsg(DEBUG,qq{E_FLAC_NOT_EXIST: Removing $flacFile from index});
+            logMsg(DEBUG, qq{E_FLAC_NOT_EXIST: Removing $flacFile from index});
             removeFlacIndex($flacFile);
             next;
         }
@@ -376,7 +379,7 @@ sub isPresentMp3 {
 
     # if mp3 already exists, just return TRUE
     if (-e $mp3File) {
-        logMsg(DEBUG,qq{$mp3File exists});
+        logMsg(DEBUG, qq{$mp3File exists});
         return TRUE;
     }
 
@@ -389,7 +392,7 @@ sub isPresentMp3 {
 ### conversion.
 ###
 
-# flac2mp3($flacFile,$mp3File)
+# flac2mp3($flacFile, $mp3File)
 #
 # generate an mp3 copy of our already existing flac file. at this time i have
 # no idea if there is a utility that will convert directly from flac to mp3.
@@ -422,7 +425,7 @@ sub flac2mp3 {
 
         # make it if it doesn't exist
         if (! -e $subfolder) {
-            logMsg(INFO,qq{Creating folder $subfolder});
+            logMsg(INFO, qq{Creating folder $subfolder});
             mkdir $subfolder;
         }
     }
@@ -441,8 +444,8 @@ sub flac2mp3 {
     my $flac2wavCmd = CMD_SOX . q{ '} . $flacFile . q{' '} . $wavFile . q{'};
 
     logMsg(INFO, qq{Converting FLAC file $flacFileNoPath to temporary WAV file});
-    logMsg(VERBOSE,qq{$flacFile --> $wavFile});
-    logMsg(DEBUG,$flac2wavCmd);
+    logMsg(VERBOSE, qq{$flacFile --> $wavFile});
+    logMsg(DEBUG, $flac2wavCmd);
 
     # if we're signaled during the conversion we'll want to remove this
     # partial file. add it to the list of active files.
@@ -462,8 +465,8 @@ sub flac2mp3 {
     my $wav2mp3Cmd = CMD_LAME . $lame_args . q{ '} . $wavFile . q{' '} . $mp3File . q{'};
 
     logMsg(INFO, qq{Converting temporary WAV file $wavFileNoPath to MP3});
-    logMsg(VERBOSE,qq{$wavFile --> $mp3File});
-    logMsg(DEBUG,$wav2mp3Cmd);
+    logMsg(VERBOSE, qq{$wavFile --> $mp3File});
+    logMsg(DEBUG, $wav2mp3Cmd);
 
     # if we're signaled during the conversion we'll want to remove this
     # partial file. add it to the list of active files.
@@ -534,7 +537,7 @@ sub execConversion {
             exec $convCmd; # exec replaces process and terminates on completion
         }
     } else {
-        logMsg(INFO,q{This is a dry run - no conversions made});
+        logMsg(INFO, q{This is a dry run - no conversions made});
     }
 }
 
@@ -547,7 +550,7 @@ sub tagMp3 {
 
     my $mp3 = MP3::Tag->new($mp3File);
 
-    logMsg(INFO,q{Setting MP3 tags});
+    logMsg(INFO, q{Setting MP3 tags});
 
     my $year     = $tags->{'date'} || $tags->{'DATE'};
     my $title    = $tags->{'title'} || $tags->{'TITLE'};
@@ -570,12 +573,12 @@ sub tagMp3 {
     $mp3->update_tags();    # commit 'em on disk
     $mp3->close();
 
-    logMsg(DEBUG,qq{Set MP3 tag: Artist = $artist});
-    logMsg(DEBUG,qq{Set MP3 tag: Album = $album});
-    logMsg(DEBUG,qq{Set MP3 tag: Genre = $genre});
-    logMsg(DEBUG,qq{Set MP3 tag: Title = $title});
-    logMsg(DEBUG,qq{Set MP3 tag: TrackNum = $tracknum});
-    logMsg(DEBUG,qq{Set MP3 tag: Year = $year});
+    logMsg(DEBUG, qq{Set MP3 tag: Artist = $artist});
+    logMsg(DEBUG, qq{Set MP3 tag: Album = $album});
+    logMsg(DEBUG, qq{Set MP3 tag: Genre = $genre});
+    logMsg(DEBUG, qq{Set MP3 tag: Title = $title});
+    logMsg(DEBUG, qq{Set MP3 tag: TrackNum = $tracknum});
+    logMsg(DEBUG, qq{Set MP3 tag: Year = $year});
 
     # Do the cover art separately.
     tagMp3APIC($mp3File, $coverBlob);
@@ -593,31 +596,31 @@ sub tagMp3APIC {
 
     my $id3;
     if (exists $mp3->{"ID3v2"}) {
-        logMsg(VERBOSE,qq{Using old ID3v2 tag});
+        logMsg(VERBOSE, qq{Using old ID3v2 tag.});
         $id3 = $mp3->{"ID3v2"};
     } else {
-       logMsg(VERBOSE,qq{Creating new ID3v2 tag});
+       logMsg(VERBOSE, qq{Creating new ID3v2 tag.});
         $id3 = $mp3->new_tag("ID3v2");
     }
 
     my $frames = $id3->supported_frames();
     if (!exists $frames->{APIC}) {
-        logMsg(WARN,qq{APIC is not a supported frame: $mp3File});
+        logMsg(WARN, qq{APIC is not a supported frame: $mp3File});
         return;
     }
 
     my $frameids = $id3->get_frame_ids();
     if (exists $$frameids{APIC}) {
-        logMsg(VERBOSE,qq{Replacing existing APIC entry.});
+        logMsg(WARN, qq{Replacing existing APIC frame.});
         $id3->change_frame("APIC", HEADER, $$imagedata);
     } else {
-        logMsg(VERBOSE,qq{Creating new APIC entry.});
+        logMsg(VERBOSE, qq{Creating new APIC frame.});
         $id3->add_frame("APIC", HEADER, $$imagedata);
     }
 
     $id3->write_tag();
     $mp3->close();
-    logMsg(VERBOSE,qq{Successfully added cover image to $mp3File.});
+    logMsg(VERBOSE, qq{Successfully added cover image to $mp3File.});
 }
 
 ###
@@ -628,7 +631,7 @@ sub tagMp3APIC {
 #
 # simple log function. write to stderr and logfile.
 sub logMsg {
-    my ($logLev,$msg) = @_;
+    my ($logLev, $msg) = @_;
     my $timestamp = timeStamp();
 
     my @logLevName = qw(MESSAGE ERROR WARN INFO VERBOSE DEBUG);
@@ -705,7 +708,7 @@ sub logFlacFile {
     return FALSE if isFlacIndexed($flacFile);
     my $rFlacFile = rFlacFile($flacFile);
 
-    $q = qq{INSERT INTO flac VALUES('} . $rFlacFile . qq{',$fsize,$mtime)};
+    $q = qq{INSERT INTO flac VALUES('} . $rFlacFile . qq{', $fsize, $mtime)};
     $sth = $dbh->prepare($q);
     $sth->execute();
 
@@ -736,7 +739,7 @@ sub updateFlacFile {
     my $flacFile = shift;
 
     my $rFlacFile = rFlacFile($flacFile);
-    my ($fsize,$mtime) = getFileStats($flacFile);
+    my ($fsize, $mtime) = getFileStats($flacFile);
 
     my $q = qq{UPDATE flac SET fsize = $fsize, mtime = $mtime WHERE flacFile = '}
        . $rFlacFile . q{'};
@@ -773,8 +776,8 @@ sub isFlacIndexCurrent {
     }
 
     if (isFlacIndexed($flacFile)) {
-        my ($fsize,$mtime) = getFileStats($flacFile);
-        my ($DB_fsize,$DB_mtime) = getFlacIndexStats($flacFile);
+        my ($fsize, $mtime) = getFileStats($flacFile);
+        my ($DB_fsize, $DB_mtime) = getFlacIndexStats($flacFile);
 
         if ($fsize == $DB_fsize && $mtime == $DB_mtime) {
             return TRUE;
@@ -791,10 +794,10 @@ sub getFileStats {
     my $fqFileName = shift;
 
     if (-e $fqFileName) {
-        return (stat $fqFileName)[FSIZE,MTIME];
+        return (stat $fqFileName)[FSIZE, MTIME];
     }
 
-    return (FALSE,FALSE);
+    return (FALSE, FALSE);
 }
 
 # getFlacIndexStats($flacFile)
@@ -821,7 +824,7 @@ sub getFlacIndexStats {
     }
 
     if (defined $fsize && defined $mtime) {
-        return ($fsize,$mtime);
+        return ($fsize, $mtime);
     }
 
     return FALSE;
@@ -853,7 +856,7 @@ sub checkFlacTbl {
 #
 # create the flac file index table
 sub createFlacTbl {
-    my $q = "CREATE TABLE flac (flacFile varchar(1024),fsize int,mtime int)";
+    my $q = "CREATE TABLE flac (flacFile varchar(1024), fsize int, mtime int)";
     my $sth = $dbh->prepare($q);
     $sth->execute();
 
