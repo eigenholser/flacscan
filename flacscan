@@ -295,8 +295,10 @@ sub copyAlbumArt {
         # mp3art file
         my $mp3art = $mp3root . q{/} . $subdir . q{/} . $2;
 
-        logMsg(DEBUG, qq{Copying $flacart, " ==> ", $mp3art});
-        copy $flacart, $mp3art;
+        logMsg(DEBUG, qq{Copying $flacart ==> $mp3art});
+        # There is a bug here. Not all album art is copied. But I don't like
+        # it anyway.
+        # copy $flacart, $mp3art;
     }
     return @albumArt;
 }
