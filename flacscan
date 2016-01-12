@@ -327,8 +327,6 @@ sub scanFlacIndex {
             $currentAlbum = $subdir;
             $newAlbum = TRUE;
             $cover = Image::Magick->new;
-        } else {
-            $newAlbum = FALSE;
         }
 
         # flac file minus directory...
@@ -350,6 +348,7 @@ sub scanFlacIndex {
 
         # Fetch art if we discover a new album.
         if ($newAlbum) {
+            $newAlbum = FALSE;
             my @albumArt = copyAlbumArt($flacroot . q{/} . $subdir);
             for my $artFile (@albumArt) {
                 # XXX: Want only if name is `cover.*'
